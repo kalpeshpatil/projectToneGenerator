@@ -1,0 +1,3 @@
+".\Objects\receive.obj" 
+TO ".\Objects\toneGenerator" 
+PRINT(".\Listings\toneGenerator.m51") RAMSIZE(256) 

@@ -1,0 +1,173 @@
+A51 MACRO ASSEMBLER  REVERSETG                                                            09/29/2015 17:30:18 PAGE     1
+
+
+MACRO ASSEMBLER A51 V8.02c
+OBJECT MODULE PLACED IN .\Objects\reverseTG.obj
+ASSEMBLER INVOKED BY: D:\Programmes\Programmes\C51\BIN\A51.EXE reverseTG.asm SET(SMALL) DEBUG PRINT(.\Listings\reverseTG
+                      .lst) OBJECT(.\Objects\reverseTG.obj) EP
+
+LOC  OBJ            LINE     SOURCE
+
+                       1     ;Square wave generator
+                       2     
+                       3     
+                       4     ;P2.0-2.3 coloumn and P2.4 - 2.7 rows
+0000                   5     ORG 00h
+0000 020050            6     LJMP main
+                       7     
+0050                   8     org 50h
+0050                   9     main:
+0050 850090           10                     mov p1, 00h;
+0053 754F14           11                     mov 4fh, #20
+0056 75A0FF           12                      MOV P2,#0FFH ;make P2 an input port
+                      13             ;K1: MOV P1,#0 ;ground all rows at once
+0059                  14             K1: 
+0059 75A00F           15                 MOV P2, #0Fh;ground all rows at once
+005C E5A0             16                  MOV A,P2 ;read all col ;(ensure keys open)
+005E 540F             17                     ANL A,#00001111B ;masked unused bits
+0060 B40F02           18                     CJNE A,#00001111B,OVER;till all keys release
+0063 80F4             19                     SJMP K1
+                      20                     
+                      21     
+                      22                      
+0065 11AD             23             OVER: ACALL DELAY ;wait 20 msec debounce time ;(delay 10ms)
+0067 75A00F           24                             MOV P2, #0FH
+006A E5A0             25                             MOV A,P2 ;check key closure
+006C 540F             26                             ANL A,#00001111B ;mask unused bits
+006E B40F02           27                             CJNE A,#00001111B,OVER1;key pressed, find row
+0071 80E6             28                             SJMP K1 ;if none, keep polling
+                      29                             
+                      30                             
+                      31     
+0073                  32             OVER1:  
+                      33                                     ;MOV P1, #11111110B ;ground row 0
+0073 75A0F0           34                                     MOV P2, #0F0h
+0076 E5A0             35                                     MOV A, P2
+0078 C3               36                                     CLR C
+                      37                                     
+0079 30A40B           38                                     JNB P2.4, ROW_0
+007C 30A50D           39                                     JNB P2.5, ROW_1
+007F 30A60F           40                                     JNB P2.6 , ROW_2
+0082 30A711           41                                     JNB P2.7, ROW_3
+                      42                     
+0085 80D2             43                                     SJMP K1
+                      44                                     
+                      45     
+                      46     
+0087 900300           47             ROW_0: MOV DPTR,#KCODE0 ;set DPTR=start of row 0
+008A 800D             48                             SJMP FIND ;find col. Key belongs to
+                      49                             
+008C 900304           50             ROW_1: MOV DPTR,#KCODE1 ;set DPTR=start of row
+008F 8008             51                             SJMP FIND ;find col. Key belongs to
+                      52                             
+0091 900308           53             ROW_2: MOV DPTR,#KCODE2 ;set DPTR=start of row 2
+0094 8003             54                             SJMP FIND ;find col. Key belongs to
+                      55                             
+0096 90030C           56             ROW_3: MOV DPTR,#KCODE3 ;set DPTR=start of row 3
+                      57             
+A51 MACRO ASSEMBLER  REVERSETG                                                            09/29/2015 17:30:18 PAGE     2
+
+0099                  58             FIND: 
+0099 C3               59                             CLR C
+009A 75A00F           60                             MOV P2, #0fh
+009D E5A0             61                             mov a, P2
+009F 13               62                             find2:          RRC A ;see if any CY bit low
+00A0 5003             63                                                     JNC MATCH ;if zero, get ASCII code
+00A2 A3               64                                                     INC DPTR ;point to next col. addr
+                      65                             
+00A3 80FA             66                                                     SJMP find2 ;keep searching
+                      67                             
+00A5                  68             MATCH: 
+00A5 E4               69                             CLR A ;set A=0 (match is found)
+00A6 93               70                             MOVC A,@A+DPTR ;get ASCII from table
+00A7 C4               71                             SWAP A;
+00A8 F590             72                             MOV P1,A ;display pressed key
+                      73                             
+00AA 020059           74                             LJMP K1
+                      75     ;ASCII LOOK-UP TABLE FOR EACH ROW
+                      76     
+                      77     
+00AD                  78     DELAY:
+                      79             USING 0
+00AD C0D0             80             PUSH PSW        ;to make sure valuse of registers are stored somewhere 
+00AF C001             81             PUSH AR1
+00B1 C002             82             PUSH AR2
+00B3 C003             83             PUSH AR3
+00B5 C0F0             84             PUSH B
+00B7 E54F             85             MOV A, 4FH      ; D
+00B9 75F00A           86             MOV B, #10      
+00BC A4               87             MUL AB          ;No. of times 50ms blocks to be executed to generate D/2 sec delay
+00BD FB               88             MOV R3, A
+                      89             
+                      90                                     ;upper loop running 10*D times
+00BE 7A28             91             MOV R2,#                40
+00C0                  92             BACK1:                                  ;inner loop of 50ms delay
+00C0 79FF             93                     MOV R1,#0FFH
+00C2                  94                     BACK :                          ;inner to inner loop
+00C2 D9FE             95                             DJNZ R1, BACK
+00C4 DAFA             96                     DJNZ R2, BACK1
+                      97             
+                      98             
+                      99             
+00C6 D0F0            100             POP B           ;restoring values of the registers
+00C8 D003            101             POP AR3
+00CA D002            102             POP AR2
+00CC D001            103             POP AR1
+00CE D0D0            104             POP PSW 
+00D0 22              105             RET
+                     106     
+                     107     
+                     108     
+0300                 109     ORG 300h
+0300 0C010203        110     KCODE0: DB 12,1,2,3 ;ROW 0
+0304 04050607        111     KCODE1: DB 4,5,6,7 ;ROW 1
+0308 08090A0B        112     KCODE2: DB 8,9,10,11 ;ROW 2
+030C 0C0D0E0F        113     KCODE3: DB 12,13,14,15 ;ROW 3
+                     114     end
+                                     
+                             
+                             
+                             
+                             
+                             
+                             
+                             
+A51 MACRO ASSEMBLER  REVERSETG                                                            09/29/2015 17:30:18 PAGE     3
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E             T Y P E  V A L U E   ATTRIBUTES
+
+AR1. . . . . . . .  D ADDR   0001H   A   
+AR2. . . . . . . .  D ADDR   0002H   A   
+AR3. . . . . . . .  D ADDR   0003H   A   
+B. . . . . . . . .  D ADDR   00F0H   A   
+BACK . . . . . . .  C ADDR   00C2H   A   
+BACK1. . . . . . .  C ADDR   00C0H   A   
+DELAY. . . . . . .  C ADDR   00ADH   A   
+FIND . . . . . . .  C ADDR   0099H   A   
+FIND2. . . . . . .  C ADDR   009FH   A   
+K1 . . . . . . . .  C ADDR   0059H   A   
+KCODE0 . . . . . .  C ADDR   0300H   A   
+KCODE1 . . . . . .  C ADDR   0304H   A   
+KCODE2 . . . . . .  C ADDR   0308H   A   
+KCODE3 . . . . . .  C ADDR   030CH   A   
+MAIN . . . . . . .  C ADDR   0050H   A   
+MATCH. . . . . . .  C ADDR   00A5H   A   
+OVER . . . . . . .  C ADDR   0065H   A   
+OVER1. . . . . . .  C ADDR   0073H   A   
+P1 . . . . . . . .  D ADDR   0090H   A   
+P2 . . . . . . . .  D ADDR   00A0H   A   
+PSW. . . . . . . .  D ADDR   00D0H   A   
+ROW_0. . . . . . .  C ADDR   0087H   A   
+ROW_1. . . . . . .  C ADDR   008CH   A   
+ROW_2. . . . . . .  C ADDR   0091H   A   
+ROW_3. . . . . . .  C ADDR   0096H   A   
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)

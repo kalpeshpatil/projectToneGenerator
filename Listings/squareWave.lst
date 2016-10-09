@@ -1,0 +1,201 @@
+A51 MACRO ASSEMBLER  SQUAREWAVE                                                           09/29/2015 17:33:19 PAGE     1
+
+
+MACRO ASSEMBLER A51 V8.02c
+OBJECT MODULE PLACED IN .\Objects\squareWave.obj
+ASSEMBLER INVOKED BY: D:\Programmes\Programmes\C51\BIN\A51.EXE squareWave.asm SET(SMALL) DEBUG PRINT(.\Listings\squareWa
+                      ve.lst) OBJECT(.\Objects\squareWave.obj) EP
+
+LOC  OBJ            LINE     SOURCE
+
+                       1     ;Square wave generator
+                       2     
+                       3     
+                       4     ;P2.0-2.3 coloumn and P2.4 - 2.7 rows
+0000                   5     ORG 00h
+0000 020050            6     LJMP main
+                       7     
+0050                   8     org 50h
+0050                   9     main:
+0050 850090           10                     mov p1, 00h;
+0053 754F14           11                     mov 4fh, #20
+0056 75A0FF           12                      MOV P2,#0FFH ;make P2 an input port
+                      13             ;K1: MOV P1,#0 ;ground all rows at once
+0059                  14             K1: 
+0059 75A00F           15                 MOV P2, #0Fh;ground all rows at once
+005C E5A0             16                  MOV A,P2 ;read all col ;(ensure keys open)
+005E 540F             17                     ANL A,#00001111B ;masked unused bits
+0060 B40F02           18                     CJNE A,#00001111B,K2 ;till all keys release
+0063 80F4             19                     SJMP K1
+                      20                     
+0065 11D9             21             K2: ACALL DELAY ;call 20 msec delay ;(delay 10ms)
+0067 75A00F           22                     MOV P2, #0FH
+006A E5A0             23                      MOV A,P2 ;see if any key is pressed; debounce
+006C 540F             24                      ANL A,#00001111B ;mask unused bits
+006E B40F02           25                      CJNE A,#00001111B,OVER;key pressed, find row
+0071 80F2             26                      SJMP K2 ;check till key pressed
+                      27                      
+0073 11D9             28             OVER: ACALL DELAY ;wait 20 msec debounce time ;(delay 10ms)
+0075 75A00F           29                             MOV P2, #0FH
+0078 E5A0             30                             MOV A,P2 ;check key closure
+007A 540F             31                             ANL A,#00001111B ;mask unused bits
+007C B40F02           32                             CJNE A,#00001111B,OVER1;key pressed, find row
+007F 80E4             33                             SJMP K2 ;if none, keep polling
+                      34     
+0081                  35             OVER1:  
+                      36                                     ;MOV P1, #11111110B ;ground row 0
+                      37                                     
+0081 75A0EF           38                                     MOV P2, #11101111B;
+0084 E5A0             39                                     MOV A,P2 ;read all columns
+0086 54F0             40                                     ANL A,#11110000B ;mask unused bits
+0088 C3               41                                     CLR C
+0089 94E0             42                                     SUBB A, #11100000B
+                      43                                     ;CJNE A,#11100000B,ROW_0 ;key row 0, find col.
+008B 6027             44                                     JZ ROW_0; 
+                      45                                     
+008D 75A0DF           46                                     MOV P2, #11011111B;
+0090 E5A0             47                                     MOV A,P2 ;read all columns
+0092 54F0             48                                     ANL A,#11110000B ;mask unused bits
+0094 C3               49                                     CLR C
+0095 94D0             50                                     SUBB A, #11010000B
+                      51                                     ;CJNE A,#11100000B,ROW_0 ;key row 0, find col.
+0097 6020             52                                     JZ ROW_1;
+                      53                                     
+0099 75A0BF           54                                     MOV P2, #10111111B;
+009C E5A0             55                                     MOV A,P2 ;read all columns
+009E 54F0             56                                     ANL A,#11110000B ;mask unused bits
+00A0 C3               57                                     CLR C
+A51 MACRO ASSEMBLER  SQUAREWAVE                                                           09/29/2015 17:33:19 PAGE     2
+
+00A1 94B0             58                                     SUBB A, #10110000B
+                      59                                     ;CJNE A,#11100000B,ROW_0 ;key row 0, find col.
+00A3 6019             60                                     JZ ROW_2;
+                      61                                     
+00A5 75A07F           62                                     MOV P2, #01111111B;
+00A8 E5A0             63                                     MOV A,P2 ;read all columns
+00AA 54F0             64                                     ANL A,#11110000B ;mask unused bits
+00AC C3               65                                     CLR C
+00AD 9470             66                                     SUBB A, #01110000B
+                      67                                     ;CJNE A,#11100000B,ROW_0 ;key row 0, find col.
+00AF 6012             68                                     JZ ROW_3;
+                      69                                     
+00B1 020065           70                                     LJMP K2 ;if none, false input, ;repeat
+                      71     
+                      72     
+00B4 900300           73             ROW_0: MOV DPTR,#KCODE0 ;set DPTR=start of row 0
+00B7 800D             74                             SJMP FIND ;find col. Key belongs to
+                      75                             
+00B9 900304           76             ROW_1: MOV DPTR,#KCODE1 ;set DPTR=start of row
+00BC 8008             77                             SJMP FIND ;find col. Key belongs to
+                      78                             
+00BE 900308           79             ROW_2: MOV DPTR,#KCODE2 ;set DPTR=start of row 2
+00C1 8003             80                             SJMP FIND ;find col. Key belongs to
+                      81                             
+00C3 90030C           82             ROW_3: MOV DPTR,#KCODE3 ;set DPTR=start of row 3
+                      83             
+00C6                  84             FIND: 
+00C6 75A00F           85                             MOV P2, #0fh
+00C9 E5A0             86                             mov a, P2
+00CB 13               87                             find2:          RRC A ;see if any CY bit low
+00CC 5003             88                                                     JNC MATCH ;if zero, get ASCII code
+00CE A3               89                                                     INC DPTR ;point to next col. addr
+                      90                             
+00CF 80FA             91                                                     SJMP find2 ;keep searching
+                      92                             
+00D1                  93             MATCH: 
+00D1 E4               94                             CLR A ;set A=0 (match is found)
+00D2 93               95                             MOVC A,@A+DPTR ;get ASCII from table
+00D3 C4               96                             SWAP A;
+00D4 F590             97                             MOV P1,A ;display pressed key
+                      98                             
+00D6 020059           99                             LJMP K1
+                     100     ;ASCII LOOK-UP TABLE FOR EACH ROW
+                     101     
+                     102     
+00D9                 103     DELAY:
+                     104             USING 0
+00D9 C0D0            105             PUSH PSW        ;to make sure valuse of registers are stored somewhere 
+00DB C001            106             PUSH AR1
+00DD C002            107             PUSH AR2
+00DF C003            108             PUSH AR3
+00E1 C0F0            109             PUSH B
+00E3 E54F            110             MOV A, 4FH      ; D
+00E5 75F00A          111             MOV B, #10      
+00E8 A4              112             MUL AB          ;No. of times 50ms blocks to be executed to generate D/2 sec delay
+00E9 FB              113             MOV R3, A
+                     114             
+                     115                                             ;upper loop running 10*D times
+00EA 7A28            116             MOV R2,#40                              
+00EC                 117             BACK1:                                  ;inner loop of 50ms delay
+00EC 79FF            118                     MOV R1,#0FFH
+00EE                 119                     BACK :                          ;inner to inner loop
+00EE D9FE            120                             DJNZ R1, BACK
+00F0 DAFA            121                     DJNZ R2, BACK1
+                     122     
+                     123             
+A51 MACRO ASSEMBLER  SQUAREWAVE                                                           09/29/2015 17:33:19 PAGE     3
+
+                     124             
+00F2 D0F0            125             POP B           ;restoring values of the registers
+00F4 D003            126             POP AR3
+00F6 D002            127             POP AR2
+00F8 D001            128             POP AR1
+00FA D0D0            129             POP PSW 
+00FC 22              130             RET
+                     131     
+                     132     
+                     133     
+0300                 134     ORG 300h
+0300 0C010203        135     KCODE0: DB 12,1,2,3 ;ROW 0
+0304 04050607        136     KCODE1: DB 4,5,6,7 ;ROW 1
+0308 08090A0B        137     KCODE2: DB 8,9,10,11 ;ROW 2
+030C 0C0D0E0F        138     KCODE3: DB 12,13,14,15 ;ROW 3
+                     139     end
+                                     
+                             
+                             
+                             
+                             
+                             
+                             
+                             
+A51 MACRO ASSEMBLER  SQUAREWAVE                                                           09/29/2015 17:33:19 PAGE     4
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E             T Y P E  V A L U E   ATTRIBUTES
+
+AR1. . . . . . . .  D ADDR   0001H   A   
+AR2. . . . . . . .  D ADDR   0002H   A   
+AR3. . . . . . . .  D ADDR   0003H   A   
+B. . . . . . . . .  D ADDR   00F0H   A   
+BACK . . . . . . .  C ADDR   00EEH   A   
+BACK1. . . . . . .  C ADDR   00ECH   A   
+DELAY. . . . . . .  C ADDR   00D9H   A   
+FIND . . . . . . .  C ADDR   00C6H   A   
+FIND2. . . . . . .  C ADDR   00CBH   A   
+K1 . . . . . . . .  C ADDR   0059H   A   
+K2 . . . . . . . .  C ADDR   0065H   A   
+KCODE0 . . . . . .  C ADDR   0300H   A   
+KCODE1 . . . . . .  C ADDR   0304H   A   
+KCODE2 . . . . . .  C ADDR   0308H   A   
+KCODE3 . . . . . .  C ADDR   030CH   A   
+MAIN . . . . . . .  C ADDR   0050H   A   
+MATCH. . . . . . .  C ADDR   00D1H   A   
+OVER . . . . . . .  C ADDR   0073H   A   
+OVER1. . . . . . .  C ADDR   0081H   A   
+P1 . . . . . . . .  D ADDR   0090H   A   
+P2 . . . . . . . .  D ADDR   00A0H   A   
+PSW. . . . . . . .  D ADDR   00D0H   A   
+ROW_0. . . . . . .  C ADDR   00B4H   A   
+ROW_1. . . . . . .  C ADDR   00B9H   A   
+ROW_2. . . . . . .  C ADDR   00BEH   A   
+ROW_3. . . . . . .  C ADDR   00C3H   A   
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)

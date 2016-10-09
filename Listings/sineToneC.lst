@@ -1,0 +1,232 @@
+C51 COMPILER V9.54   SINETONEC                                                             10/13/2015 15:04:39 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE SINETONEC
+OBJECT MODULE PLACED IN .\Objects\sineToneC.obj
+COMPILER INVOKED BY: D:\Programmes\Programmes\C51\BIN\C51.EXE sineToneC.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PR
+                    -INT(.\Listings\sineToneC.lst) TABS(2) OBJECT(.\Objects\sineToneC.obj)
+
+line level    source
+
+   1          /**
+   2           Square Tone Generator
+   3           */
+   4          
+   5          /* @section  I N C L U D E S */
+   6          #include "at89c5131.h"
+   7          #include "stdio.h"
+   8          
+   9          
+  10          void timer0isr();
+  11          void timerInit();
+  12          void delay_ms(int);
+  13          
+  14          
+  15          unsigned char sendMSB [] = {0x77, 0x7a, 0x7b, 0x7d, 0x7e, 0x7f, 0x7f,
+  16                                      0x7f, 0x7e,0x7d, 0x7b, 0x7a, 0x77,
+  17                                      0x75,0x74,0x72,0x71,0x70,0x70,
+  18                                      0x70,0x71,0x72,0x74,0x75};
+  19          unsigned char sendLSB [] = {0xff, 0x11,  0xff, 0xa7, 0xed, 0xb9, 0xff,
+  20                                      0xb9, 0xed, 0xa7, 0xff, 0x11, 0xff,
+  21                                      0xed,0x00,0x58,0x12,0x46,0x00,
+  22                                      0x46,0x12,0x58,0x00,0xed};  
+  23          
+  24          unsigned char tempsine1 = 0x77;
+  25          unsigned char tempsine2 = 0xff;       
+  26                                      
+  27          int oct_sel =1;
+  28          int oct_freq = 1; 
+  29          
+  30          unsigned char port2;
+  31          
+  32          bit sendVal = 1;
+  33          
+  34          unsigned char tmh = 0xf7;
+  35          unsigned char tml = 0xdd ;
+  36          unsigned char acc;
+  37          
+  38          unsigned char i, j;
+  39          bit f1 = 0;
+  40          
+  41          unsigned char keypadArray [] = {
+  42            0xFf,0x51,0xFf,0x5c,0xFf,0x65,0xFf,0x6c,
+  43            0xFf,0x74,0xFf,0x7c,0xFf,0x85,0xff,0x8b,
+  44            0xFf,0x92,0xFf,0x98,0xFf,0x9d,0xFf,0xA2};
+  45          
+  46          unsigned char oct_sel_array[] = {4,2,1,1};
+  47          
+  48          //SPI functions
+  49          void SPI_Init();
+  50          unsigned char datasend8bit;
+  51          unsigned char serial_data;                            
+  52          sbit CS_BAR = P1^4;                 // Chip Select for the DAC
+  53          sbit ldac = P3^0;
+  54          bit transmit_completed= 0;          // To check if spi data transmit is complete
+C51 COMPILER V9.54   SINETONEC                                                             10/13/2015 15:04:39 PAGE 2   
+
+  55          int iter = 0;
+  56          
+  57          unsigned int serial;                            
+  58          
+  59                                      
+  60          void it_SPI(void) interrupt 9 /* interrupt address is 0x004B */
+  61          {
+  62   1        switch  ( SPSTA )         /* read and clear spi status register */
+  63   1        {
+  64   2          case 0x80:  
+  65   2            serial_data=SPDAT;   /* read receive data */
+  66   2            transmit_completed=1;/* set software flag */
+  67   2          break;
+  68   2      
+  69   2          case 0x10:
+  70   2               /* put here for mode fault tasking */  
+  71   2          break;
+  72   2        
+  73   2          case 0x40:
+  74   2               /* put here for overrun tasking */ 
+  75   2          break;
+  76   2        }
+  77   1      }
+  78          
+  79          /**
+  80          
+  81           * FUNCTION_INPUTS:  P1.5(MISO) serial input  
+  82           * FUNCTION_OUTPUTS: P1.7(MOSI) serial output
+  83           *                   P1.4(SSbar)
+  84                               P1.6(SCK)
+  85           */ 
+  86          void SPI_Init()
+  87          {
+  88   1        CS_BAR = 1;                     // DISABLE ADC SLAVE SELECT-CS 
+  89   1        SPCON |= 0x20;                  // P1.1(SSBAR) is available as standard I/O pin 
+  90   1        SPCON |= 0x01;                  // Fclk Periph/4 AND Fclk Periph=12MHz ,HENCE SCK IE. BAUD RATE=3000KHz 
+  91   1        SPCON |= 0x10;                  // Master mode 
+  92   1        SPCON &= ~0x08;                 // CPOL=0; transmit mode example|| SCK is 0 at idle state
+  93   1        SPCON |= 0x04;                  // CPHA=1; transmit mode example 
+  94   1        IEN1 |= 0x04;                   // enable spi interrupt 
+  95   1        EA=1;                           // enable interrupts 
+  96   1        SPCON |= 0x40;                  // run spi;ENABLE SPI INTERFACE SPEN= 1 
+  97   1      }
+  98          //
+  99          
+ 100          void timerInit(){
+ 101   1        TH0 = 0xff  ;                   //For 25ms operation
+ 102   1        TL0 = 0x51;
+ 103   1        TMOD = (TMOD & 0xF0) | 0x01;   
+ 104   1        EA = 1;       // Set T/C0 Mode 
+ 105   1        ET0 = 1;      // Enable Timer 0 Interrupts 
+ 106   1        TR0 = 1;   
+ 107   1      }
+ 108          
+ 109          void timer0isr() interrupt 1 {
+ 110   1        TH0 = tmh;
+ 111   1        TL0 = tml;
+ 112   1        if(oct_sel == 1){
+ 113   2          if(iter == 24) { iter = 0;}
+ 114   2         tempsine1 = sendMSB[iter]; 
+ 115   2         tempsine2 = sendLSB[iter]; 
+ 116   2         iter++;  
+C51 COMPILER V9.54   SINETONEC                                                             10/13/2015 15:04:39 PAGE 3   
+
+ 117   2         oct_sel = oct_freq;
+ 118   2         sendVal = 1;
+ 119   2        }
+ 120   1        else{
+ 121   2          oct_sel -- ;
+ 122   2        }
+ 123   1      }
+ 124          
+ 125          void delay_ms(int delay)
+ 126          {
+ 127   1        int d=0;
+ 128   1        while(delay>0)
+ 129   1        {
+ 130   2          for(d=0;d<382;d++);
+ 131   2          delay--;
+ 132   2        }
+ 133   1      }
+ 134          
+ 135          void main(){
+ 136   1        
+ 137   1         P0 = 0x00;
+ 138   1         P2 = 0xFF;
+ 139   1         timerInit();
+ 140   1         SPI_Init();
+ 141   1         
+ 142   1        while(1){
+ 143   2          
+ 144   2          if(sendVal ==1){
+ 145   3          CS_BAR = 0;                 // enable DAC as slave     
+ 146   3          ldac = 1;
+ 147   3          SPDAT= tempsine1;
+ 148   3          while(!transmit_completed);
+ 149   3          transmit_completed = 0;
+ 150   3          SPDAT = tempsine2;
+ 151   3          while(!transmit_completed);
+ 152   3          transmit_completed = 0;
+ 153   3          CS_BAR = 1;
+ 154   3          ldac = 0;
+ 155   3          sendVal = 0;
+ 156   3          }
+ 157   2          P2 = 0x0F;//ground all rows at once
+ 158   2          acc = P2 ;//read all col ;(ensure keys open)
+ 159   2          acc &= 0x0f;// ;masked unused bits
+ 160   2          if(acc == 0x0f) continue;
+ 161   2          f1 = 1;
+ 162   2          
+ 163   2            delay_ms(10);
+ 164   2            P2 = 0x0F;//ground all rows at once
+ 165   2            acc = P2 ;//read all col ;(ensure keys open)
+ 166   2            acc &= 0x0f;// ;masked unused bits
+ 167   2            if(acc == 0x0f) continue;
+ 168   2            
+ 169   2            delay_ms(10);
+ 170   2            P2 = 0x0F;//ground all rows at once
+ 171   2            acc = P2 ;//read all col ;(ensure keys open)
+ 172   2            acc &= 0x0f;// ;masked unused bits
+ 173   2            if(acc == 0x0f) continue;
+ 174   2            
+ 175   2            
+ 176   2            P2=0xF0;
+ 177   2            
+ 178   2            if(P2 == 0xE0) {i=0;}
+C51 COMPILER V9.54   SINETONEC                                                             10/13/2015 15:04:39 PAGE 4   
+
+ 179   2            else if(P2 == 0xD0 ) {i=1;}
+ 180   2            else if(P2 == 0xB0) {i=2;}
+ 181   2            else if (P2 ==0x70 ) {i=3;}
+ 182   2            
+ 183   2            P2 = 0x0f;
+ 184   2            
+ 185   2            if(P2 == 0x0e) {j=0;}
+ 186   2            else if(P2 == 0x0d) {j=1;}
+ 187   2            else if(P2 == 0x0b) {j=2;}
+ 188   2            else if(P2 == 0x07) {j=3;}
+ 189   2            
+ 190   2            if(i<3){
+ 191   3            tmh = keypadArray[8*i+2*j];
+ 192   3            tml = keypadArray[8*i+2*j+1];
+ 193   3            }
+ 194   2            else
+ 195   2            {oct_freq = oct_sel_array[j];}
+ 196   2            
+ 197   2            f1 = 0;
+ 198   2            
+ 199   2          
+ 200   2        }
+ 201   1            
+ 202   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    441    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     94    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      3    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

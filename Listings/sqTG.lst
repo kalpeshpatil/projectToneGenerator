@@ -1,0 +1,207 @@
+A51 MACRO ASSEMBLER  SQTG                                                                 10/04/2015 21:51:39 PAGE     1
+
+
+MACRO ASSEMBLER A51 V8.02c
+OBJECT MODULE PLACED IN .\Objects\sqTG.obj
+ASSEMBLER INVOKED BY: D:\Programmes\Programmes\C51\BIN\A51.EXE sqTG.asm SET(SMALL) DEBUG PRINT(.\Listings\sqTG.lst) OBJE
+                      CT(.\Objects\sqTG.obj) EP
+
+LOC  OBJ            LINE     SOURCE
+
+0000                   1     ORG 00h
+0000 020050            2     LJMP MAIN
+                       3     
+                       4     
+                       5             
+000B                   6     ORG 000BH
+                       7             
+000B 12000F            8             LCALL OCTAVE
+000E 32                9             RETI
+                      10             
+000F                  11     OCTAVE:  
+000F 85218C           12                   MOV TH0, 21H
+0012 85208A           13                   MOV TL0, 20H
+0015 D804             14                             DJNZ R0, FIN
+0017 B281             15                             CPL P0.1
+0019 A830             16                             MOV R0, 30H
+001B 22               17         FIN: RET
+                      18     
+0050                  19     ORG 50H
+                      20     
+0050                  21     MAIN:
+0050 7580FF           22                      MOV P0,#0FFH;
+0053 75A0FF           23                      MOV P2,#0FFH ;make P2 an input port
+0056 753001           24                      MOV 30H,#1 ; DEFAULT 480 HZ OCTAVE
+0059 758901           25                      MOV TMOD, #01H
+005C 758CF7           26                      MOV TH0,#0F7H ; DEFAULT IS FOR 480HZ OCTAVE
+005F 758ADD           27                      MOV TL0,#0DDH
+0062 D2A9             28                      SETB IE.1
+0064 D2AF             29                      SETB IE.7
+0066 D28C             30                      SETB TR0
+0068                  31             K1: 
+0068 75A00F           32                 MOV P2, #0Fh;ground all rows at once
+006B E5A0             33                  MOV A,P2 ;read all col ;(ensure keys open)
+006D 540F             34                     ANL A,#00001111B ;masked unused bits
+006F B40F03           35                     CJNE A,#00001111B,K2;till all keys release
+0072 020068           36                     LJMP K1
+                      37     
+0075 11E5             38          K2: ACALL DELAY ;wait 10 msec debounce time ;(delay 10ms)
+0077 75A00F           39                             MOV P2, #0FH
+007A E5A0             40                             MOV A,P2 ;check key closure
+007C 540F             41                             ANL A,#00001111B ;mask unused bits
+007E B40F02           42                             CJNE A,#00001111B,OVER;key pressed, find row
+0081 80F2             43                             SJMP K2 ;if none, keep polling
+                      44                      
+0083 11E5             45             OVER: ACALL DELAY ;wait 20 msec debounce time ;(delay 10ms)
+0085 75A00F           46                             MOV P2, #0FH
+0088 E5A0             47                             MOV A,P2 ;check key closure
+008A 540F             48                             ANL A,#00001111B ;mask unused bits
+008C B40F02           49                             CJNE A,#00001111B,OVER1;key pressed, find row
+008F 80E4             50                             SJMP K2 ;if none, keep polling
+                      51                             
+                      52                             
+                      53     
+0091                  54             OVER1:  
+                      55                                     ;MOV P1, #11111110B ;ground row 0
+0091 75A0F0           56                                     MOV P2, #0F0h
+0094 E5A0             57                                     MOV A, P2
+A51 MACRO ASSEMBLER  SQTG                                                                 10/04/2015 21:51:39 PAGE     2
+
+0096 C3               58                                     CLR C
+                      59                                     
+0097 30A40B           60                                     JNB P2.4, ROW_0
+009A 30A50D           61                                     JNB P2.5, ROW_1
+009D 30A60F           62                                     JNB P2.6 , ROW_2
+00A0 30A711           63                                     JNB P2.7, ROW_3
+                      64                     
+00A3 80C3             65                                     SJMP K1
+                      66                                     
+                      67     
+                      68     
+00A5 900300           69             ROW_0: MOV DPTR,#KCODE0 ;set DPTR=start of row 0
+00A8 8022             70                             SJMP FIND ;find col. Key belongs to
+                      71                             
+00AA 900308           72             ROW_1: MOV DPTR,#KCODE1 ;set DPTR=start of row
+00AD 801D             73                             SJMP FIND ;find col. Key belongs to
+                      74                             
+00AF 900310           75             ROW_2: MOV DPTR,#KCODE2 ;set DPTR=start of row 2
+00B2 8018             76                             SJMP FIND ;find col. Key belongs to
+                      77                             
+00B4 900318           78             ROW_3: MOV DPTR,#KCODE3 ;set DPTR=start of row 3
+00B7 C3               79             FIND3:CLR C
+00B8 75A00F           80                             MOV P2, #0fh
+00BB E5A0             81                             mov a, P2
+00BD 13               82                             find4:          RRC A ;see if any CY bit low
+00BE 5003             83                                                     JNC MATCH1 ;if zero, get ASCII code
+00C0 A3               84                                                     INC DPTR ;point to next col. add
+00C1 80FA             85                                                     SJMP find4 ;keep searching
+                      86             
+00C3                  87             MATCH1: 
+00C3 E4               88             CLR A ;set A=0 (match is found)
+00C4 93               89                             MOVC A,@A+DPTR ;get ASCII from table
+00C5 F530             90                             MOV 30H,A; FACTOR FOR OCTAVE
+00C7 A830             91                             MOV R0,30H
+00C9 020068           92                             LJMP K1
+                      93                             
+00CC                  94             FIND: 
+00CC C3               95                             CLR C
+00CD 75A00F           96                             MOV P2, #0fh
+00D0 E5A0             97                             mov a, P2
+00D2 13               98                             find2:          RRC A ;see if any CY bit low
+00D3 5004             99                                                     JNC MATCH ;if zero, get ASCII code
+00D5 A3              100                                                     INC DPTR ;point to next col. addr
+00D6 A3              101                                         INC DPTR ; TWO BYTES FOR TIMER
+00D7 80F9            102                                                     SJMP find2 ;keep searching
+                     103                             
+00D9                 104             MATCH: 
+00D9 E4              105                             CLR A ;set A=0 (match is found)
+00DA 93              106                             MOVC A,@A+DPTR ;get ASCII from table
+00DB F521            107                             MOV 21H,A; TH0
+00DD A3              108                             INC DPTR 
+00DE E4              109                             CLR A
+00DF 93              110                             MOVC A, @A+DPTR
+00E0 F520            111                             MOV 20H,A ; TL0
+00E2 020068          112                             LJMP K1
+                     113     
+                     114     
+00E5                 115     DELAY:
+                     116             USING 0
+00E5 C0D0            117             PUSH PSW        ;to make sure valuse of registers are stored somewhere 
+00E7 C001            118             PUSH AR1
+00E9 C002            119             PUSH AR2
+                     120             
+                     121                                     ;upper loop running 10*D times
+00EB 7A28            122             MOV R2,#40
+00ED                 123              BACK1:                                 ;inner loop of 50ms delay
+A51 MACRO ASSEMBLER  SQTG                                                                 10/04/2015 21:51:39 PAGE     3
+
+00ED 79FF            124                      MOV R1,#0FFH
+00EF                 125                       BACK:                         ;inner to inner loop
+00EF D9FE            126                             DJNZ R1, BACK
+00F1 DAFA            127                     DJNZ R2, BACK1
+                     128             
+00F3 D002            129             POP AR2
+00F5 D001            130             POP AR1
+00F7 D0D0            131             POP PSW 
+00F9 22              132             RET
+                     133     
+                     134     
+                     135     ;ASCII LOOK-UP TABLE FOR EACH ROW
+0300                 136     ORG 300h
+0300 F7DDF85F        137     KCODE0: DB  0F7H,0DDH ,0F8H,5FH,0F8H,0C4H,0F9H,22H ;ROW 0
+0304 F8C4F922                
+0308 F97DF9E5        138     KCODE1: DB  0F9H,7DH,0F9h,0E5H,0FAH,46H,0FAH,93H ;ROW 1
+030C FA46FA93                
+0310 FAE9FB2D        139     KCODE2: DB  0FAH,0E9H,0FBH,2DH ,0FBH,6CH,0FBH,0A8H;ROW 2
+0314 FB6CFBA8                
+0318 04020101        140     KCODE3: DB   4,2,1,1 ;ROW 3
+                     141     end
+                                     
+A51 MACRO ASSEMBLER  SQTG                                                                 10/04/2015 21:51:39 PAGE     4
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E             T Y P E  V A L U E   ATTRIBUTES
+
+AR1. . . . . . . .  D ADDR   0001H   A   
+AR2. . . . . . . .  D ADDR   0002H   A   
+BACK . . . . . . .  C ADDR   00EFH   A   
+BACK1. . . . . . .  C ADDR   00EDH   A   
+DELAY. . . . . . .  C ADDR   00E5H   A   
+FIN. . . . . . . .  C ADDR   001BH   A   
+FIND . . . . . . .  C ADDR   00CCH   A   
+FIND2. . . . . . .  C ADDR   00D2H   A   
+FIND3. . . . . . .  C ADDR   00B7H   A   
+FIND4. . . . . . .  C ADDR   00BDH   A   
+IE . . . . . . . .  D ADDR   00A8H   A   
+K1 . . . . . . . .  C ADDR   0068H   A   
+K2 . . . . . . . .  C ADDR   0075H   A   
+KCODE0 . . . . . .  C ADDR   0300H   A   
+KCODE1 . . . . . .  C ADDR   0308H   A   
+KCODE2 . . . . . .  C ADDR   0310H   A   
+KCODE3 . . . . . .  C ADDR   0318H   A   
+MAIN . . . . . . .  C ADDR   0050H   A   
+MATCH. . . . . . .  C ADDR   00D9H   A   
+MATCH1 . . . . . .  C ADDR   00C3H   A   
+OCTAVE . . . . . .  C ADDR   000FH   A   
+OVER . . . . . . .  C ADDR   0083H   A   
+OVER1. . . . . . .  C ADDR   0091H   A   
+P0 . . . . . . . .  D ADDR   0080H   A   
+P2 . . . . . . . .  D ADDR   00A0H   A   
+PSW. . . . . . . .  D ADDR   00D0H   A   
+ROW_0. . . . . . .  C ADDR   00A5H   A   
+ROW_1. . . . . . .  C ADDR   00AAH   A   
+ROW_2. . . . . . .  C ADDR   00AFH   A   
+ROW_3. . . . . . .  C ADDR   00B4H   A   
+TH0. . . . . . . .  D ADDR   008CH   A   
+TL0. . . . . . . .  D ADDR   008AH   A   
+TMOD . . . . . . .  D ADDR   0089H   A   
+TR0. . . . . . . .  B ADDR   0088H.4 A   
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)

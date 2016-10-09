@@ -1,0 +1,124 @@
+C51 COMPILER V9.54   SAMPLESINEC                                                           10/05/2015 18:47:02 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE SAMPLESINEC
+OBJECT MODULE PLACED IN .\Objects\sampleSineC.obj
+COMPILER INVOKED BY: D:\Programmes\Programmes\C51\BIN\C51.EXE sampleSineC.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND 
+                    -PRINT(.\Listings\sampleSineC.lst) TABS(2) OBJECT(.\Objects\sampleSineC.obj)
+
+line level    source
+
+   1          /**
+   2           Square Tone Generator
+   3           */
+   4          
+   5          /* @section  I N C L U D E S */
+   6          #include "at89c5131.h"
+   7          #include "stdio.h"
+   8          #include "math.h"
+   9          
+  10          unsigned char sendMSB [] = {0x77, 0x7a, 0x7b, 0x7d, 0x7e, 0x7f, 0x7f,
+  11                                      0x7f, 0x7e,0x7d, 0x7b, 0x7a, 0x77,
+  12                                      0x75,0x74,0x72,0x71,0x70,0x70,
+  13                                      0x70,0x71,0x72,0x74,0x75};
+  14          unsigned char sendLSB [] = {0xff, 0x11,  0xff, 0xa7, 0xed, 0xb9, 0xff,
+  15                                      0xb9, 0xed, 0xa7, 0xff, 0x11, 0xff,
+  16                                      0xed,0x00,0x58,0x12,0x46,0x00,
+  17                                      0x46,0x12,0x58,0x00,0xed};  
+  18          
+  19          
+  20            
+  21          void SPI_Init();
+  22          void sdelay(int delay);
+  23          unsigned char datasend8bit;
+  24          unsigned char serial_data;                            
+  25          sbit CS_BAR = P1^4;                 // Chip Select for the DAC
+  26          sbit ldac = P3^0;
+  27          bit transmit_completed= 0;          // To check if spi data transmit is complete
+  28          int iter = 12;
+  29          
+  30          unsigned int serial;                            
+  31          
+  32                                      
+  33          void it_SPI(void) interrupt 9 /* interrupt address is 0x004B */
+  34          {
+  35   1        switch  ( SPSTA )         /* read and clear spi status register */
+  36   1        {
+  37   2          case 0x80:  
+  38   2            serial_data=SPDAT;   /* read receive data */
+  39   2            transmit_completed=1;/* set software flag */
+  40   2          break;
+  41   2      
+  42   2          case 0x10:
+  43   2               /* put here for mode fault tasking */  
+  44   2          break;
+  45   2        
+  46   2          case 0x40:
+  47   2               /* put here for overrun tasking */ 
+  48   2          break;
+  49   2        }
+  50   1      }
+  51          
+  52          /**
+  53          
+  54           * FUNCTION_INPUTS:  P1.5(MISO) serial input  
+C51 COMPILER V9.54   SAMPLESINEC                                                           10/05/2015 18:47:02 PAGE 2   
+
+  55           * FUNCTION_OUTPUTS: P1.7(MOSI) serial output
+  56           *                   P1.4(SSbar)
+  57                               P1.6(SCK)
+  58           */ 
+  59          void SPI_Init()
+  60          {
+  61   1        CS_BAR = 1;                     // DISABLE ADC SLAVE SELECT-CS 
+  62   1        SPCON |= 0x20;                  // P1.1(SSBAR) is available as standard I/O pin 
+  63   1        SPCON |= 0x01;                  // Fclk Periph/4 AND Fclk Periph=12MHz ,HENCE SCK IE. BAUD RATE=3000KHz 
+  64   1        SPCON |= 0x10;                  // Master mode 
+  65   1        SPCON &= ~0x08;                 // CPOL=0; transmit mode example|| SCK is 0 at idle state
+  66   1        SPCON |= 0x04;                  // CPHA=1; transmit mode example 
+  67   1        IEN1 |= 0x04;                   // enable spi interrupt 
+  68   1        EA=1;                           // enable interrupts 
+  69   1        SPCON |= 0x40;                  // run spi;ENABLE SPI INTERFACE SPEN= 1 
+  70   1      }
+  71          
+  72          void main(){
+  73   1        SPI_Init();
+  74   1        iter = 0;
+  75   1      while (1){
+  76   2        if(iter == 24) { iter = 0;}
+  77   2        
+  78   2        
+  79   2        CS_BAR = 0;                 // enable DAC as slave     
+  80   2        ldac = 1;
+  81   2        SPDAT= sendMSB[iter];   
+  82   2        //SPDAT = 0x7b; // Write start bit to start ADC 
+  83   2        while(!transmit_completed);
+  84   2        transmit_completed = 0;
+  85   2        
+  86   2        SPDAT = sendLSB[iter];
+  87   2        //SPDAT = 0xf0;
+  88   2        while(!transmit_completed);
+  89   2        transmit_completed = 0;
+  90   2        
+  91   2        CS_BAR = 1;
+  92   2        ldac = 0;
+  93   2        iter++;
+  94   2      }
+  95   1      }
+  96            
+  97            
+  98            
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    118    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     54    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
